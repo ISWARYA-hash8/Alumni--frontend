@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply min-h-screen bg-slate-100 text-[15px] text-slate-900;
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
+  body {
+    -webkit-overflow-scrolling: touch;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  * {
+    @apply border-slate-200;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-3xl border border-slate-200 bg-white shadow-soft;
+  }
+
+  .glass-navbar {
+    @apply border-b border-slate-200 bg-white/90 backdrop-blur;
+  }
+
+  .glass-sidebar {
+    @apply border-r border-slate-200 bg-white;
+  }
+
+  .glass-input {
+    @apply w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100;
+  }
+
+  .btn-glow {
+    @apply rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.2s ease-out;
+}
