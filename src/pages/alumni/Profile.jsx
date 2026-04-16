@@ -23,6 +23,12 @@ const DEPARTMENTS = [
   "Fashion Technology",
   "Food Technology",
   "Agricultural Engineering",
+  "Artificial Intelligence and Data Science",
+  "Artificial Intelligence and Machine Learning",
+  "Biotechnology",
+  "Biomedical",
+  "Textile Engineering",
+  "Computer Science and Design",
   "Other"
 ];
 
@@ -34,19 +40,23 @@ const defaultForm = {
   location: "",
   contact: "",
   linkedinUrl: "",
-  photoUrl: "",
+  profilePhoto: "",
   skills: []
 };
 
-function FieldLabel({ children, required = false, optional = false }) {
-  return (
-    <label className="block text-sm font-semibold text-slate-700">
-      {children}
-      {required ? <span className="ml-1 text-red-500">*</span> : null}
-      {optional ? <span className="ml-2 text-xs font-medium text-slate-400">(Optional)</span> : null}
-    </label>
-  );
-}
+const MAX_PROFILE_PHOTO_SIZE = 2 * 1024 * 1024;
+
+const getProfilePhoto = (data = {}) =>
+  data.profilePhoto || data.profileImageUrl || data.avatarUrl || "";
+
+const getInitials = (name = "") =>
+  name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "A";
 
 function MyProfile() {
   const [formData, setFormData] = useState(defaultForm);
@@ -54,6 +64,8 @@ function MyProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const fileInputRef = useRef(null);
+  const { updateUser } = useAuth();
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -70,13 +82,8 @@ function MyProfile() {
           location: data.location || "",
           contact: data.contact || "",
           linkedinUrl: data.linkedinUrl || "",
-          photoUrl: data.photoUrl || "",
-          skills: data.skills
-            ? data.skills
-                .split(",")
-                .map((skill) => skill.trim())
-                .filter(Boolean)
-            : []
+          profilePhoto: getProfilePhoto(data),
+          skills: data.skills ? data.skills.split(",").filter(Boolean) : []
         });
       } catch (error) {
         addToast(getErrorMessage(error, "Unable to load profile."), "error");
@@ -95,28 +102,6 @@ function MyProfile() {
       nextErrors.name = "Full name is required.";
     }
 
-    if (!formData.batchYear.trim()) {
-      nextErrors.batchYear = "Batch year is required.";
-    } else if (!/^\d{4}$/.test(formData.batchYear.trim())) {
-      nextErrors.batchYear = "Batch year should be a 4 digit year.";
-    }
-
-    if (!formData.department) {
-      nextErrors.department = "Department is required.";
-    }
-
-    if (!formData.profession.trim()) {
-      nextErrors.profession = "Profession is required.";
-    }
-
-    if (!formData.contact.trim()) {
-      nextErrors.contact = "Contact is required.";
-    }
-
-    if (!formData.location.trim()) {
-      nextErrors.location = "Location is required.";
-    }
-
     if (
       formData.linkedinUrl &&
       !/^(https?:\/\/)?(www\.)?linkedin\.com\/.+/i.test(formData.linkedinUrl)
@@ -124,12 +109,64 @@ function MyProfile() {
       nextErrors.linkedinUrl = "Enter a valid LinkedIn profile URL.";
     }
 
-    if (formData.photoUrl && !/^https?:\/\/.+/i.test(formData.photoUrl)) {
-      nextErrors.photoUrl = "Enter a valid profile photo URL.";
+    if (formData.batchYear && !/^\d{4}$/.test(formData.batchYear)) {
+      nextErrors.batchYear = "Batch year should be a 4 digit year.";
     }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
+  };
+
+  const readFileAsDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Unable to read the selected image."));
+      reader.readAsDataURL(file);
+    });
+
+  const handlePhotoChange = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      addToast("Please choose an image file for your profile photo.", "error");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_PHOTO_SIZE) {
+      addToast("Profile photo must be 2 MB or smaller.", "error");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const imageDataUrl = await readFileAsDataUrl(file);
+      setFormData((current) => ({
+        ...current,
+        profilePhoto: imageDataUrl
+      }));
+      addToast("Profile photo selected. Save profile to keep it.", "success");
+    } catch (error) {
+      addToast(getErrorMessage(error, "Unable to use that image."), "error");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setFormData((current) => ({
+      ...current,
+      profilePhoto: ""
+    }));
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -144,14 +181,19 @@ function MyProfile() {
     try {
       await updateProfile({
         name: formData.name.trim(),
-        batchYear: formData.batchYear.trim(),
+        batchYear: formData.batchYear,
         department: formData.department,
-        profession: formData.profession.trim(),
-        location: formData.location.trim(),
-        contact: formData.contact.trim(),
+        profession: formData.profession,
+        location: formData.location,
+        contact: formData.contact,
         linkedinUrl: formData.linkedinUrl.trim(),
-        photoUrl: formData.photoUrl.trim(),
+        profilePhoto: formData.profilePhoto,
         skills: formData.skills.join(",")
+      });
+
+      updateUser({
+        name: formData.name.trim(),
+        profilePhoto: formData.profilePhoto
       });
 
       addToast("Profile updated successfully.", "success");
@@ -186,13 +228,6 @@ function MyProfile() {
     return <Loader label="Loading profile..." />;
   }
 
-  const initials = formData.name
-    .split(" ")
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <div className="space-y-8 p-6 md:p-8">
       <PageHeader
@@ -201,41 +236,71 @@ function MyProfile() {
       />
 
       <div className="max-w-5xl rounded-3xl bg-white p-6 shadow-soft md:p-8">
-        <div className="mb-6 flex flex-col gap-5 rounded-3xl bg-slate-50 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-700">
-              Fields marked with <span className="text-red-500">*</span> are mandatory.
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Profile photo is optional and will be shown in your alumni card when provided.
-            </p>
-          </div>
-
+        <div className="mb-8 flex flex-col gap-5 rounded-3xl border border-slate-200 bg-slate-50 p-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            {formData.photoUrl ? (
+            {formData.profilePhoto ? (
               <img
-                src={formData.photoUrl}
-                alt={formData.name || "Profile photo"}
-                className="h-20 w-20 rounded-3xl object-cover"
+                src={formData.profilePhoto}
+                alt={formData.name || "Profile preview"}
+                className="h-24 w-24 rounded-3xl object-cover shadow-soft"
               />
             ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-600 text-2xl font-bold text-white">
-                {initials || "A"}
+              <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-indigo-600 text-2xl font-bold text-white shadow-soft">
+                {getInitials(formData.name)}
               </div>
             )}
 
             <div>
-              <p className="text-lg font-semibold text-slate-900">{formData.name || "Your profile"}</p>
-              <p className="text-sm text-slate-500">
-                {formData.profession || "Add your profession"}{formData.location ? ` | ${formData.location}` : ""}
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-indigo-500">
+                Profile Photo
+              </p>
+              <h2 className="mt-2 text-lg font-semibold text-slate-900">
+                Add a clear headshot for your alumni profile
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Use JPG, PNG, or WebP up to 2 MB.
               </p>
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
+            <Button
+              type="button"
+              className="inline-flex items-center gap-2"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={16} />
+              {formData.profilePhoto ? "Change Photo" : "Upload Photo"}
+            </Button>
+            {formData.profilePhoto ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="inline-flex items-center gap-2"
+                onClick={handleRemovePhoto}
+              >
+                <Trash2 size={16} />
+                Remove
+              </Button>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-medium text-slate-500">
+                <Camera size={16} />
+                No photo selected
+              </div>
+            )}
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <div>
-            <FieldLabel required>Full Name</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">Full Name</label>
             <input
               type="text"
               value={formData.name}
@@ -248,7 +313,7 @@ function MyProfile() {
           </div>
 
           <div>
-            <FieldLabel required>Batch Year</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">Batch Year</label>
             <input
               type="text"
               value={formData.batchYear}
@@ -262,7 +327,7 @@ function MyProfile() {
           </div>
 
           <div>
-            <FieldLabel required>Department</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">Department</label>
             <select
               value={formData.department}
               onChange={(event) =>
@@ -277,11 +342,10 @@ function MyProfile() {
                 </option>
               ))}
             </select>
-            {errors.department ? <p className="mt-2 text-sm text-red-600">{errors.department}</p> : null}
           </div>
 
           <div>
-            <FieldLabel required>Profession</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">Profession</label>
             <input
               type="text"
               value={formData.profession}
@@ -290,11 +354,10 @@ function MyProfile() {
               }
               className="glass-input mt-2"
             />
-            {errors.profession ? <p className="mt-2 text-sm text-red-600">{errors.profession}</p> : null}
           </div>
 
           <div>
-            <FieldLabel required>Contact</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">Contact</label>
             <input
               type="text"
               value={formData.contact}
@@ -303,11 +366,10 @@ function MyProfile() {
               }
               className="glass-input mt-2"
             />
-            {errors.contact ? <p className="mt-2 text-sm text-red-600">{errors.contact}</p> : null}
           </div>
 
           <div>
-            <FieldLabel required>Location</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">Location</label>
             <input
               type="text"
               value={formData.location}
@@ -316,25 +378,10 @@ function MyProfile() {
               }
               className="glass-input mt-2"
             />
-            {errors.location ? <p className="mt-2 text-sm text-red-600">{errors.location}</p> : null}
           </div>
 
           <div className="md:col-span-2">
-            <FieldLabel optional>Profile Photo URL</FieldLabel>
-            <input
-              type="url"
-              value={formData.photoUrl}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, photoUrl: event.target.value }))
-              }
-              className="glass-input mt-2"
-              placeholder="https://example.com/photo.jpg"
-            />
-            {errors.photoUrl ? <p className="mt-2 text-sm text-red-600">{errors.photoUrl}</p> : null}
-          </div>
-
-          <div className="md:col-span-2">
-            <FieldLabel optional>LinkedIn Profile</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">LinkedIn Profile</label>
             <input
               type="url"
               value={formData.linkedinUrl}
@@ -350,7 +397,7 @@ function MyProfile() {
           </div>
 
           <div className="md:col-span-2">
-            <FieldLabel optional>Skills</FieldLabel>
+            <label className="block text-sm font-semibold text-slate-700">Skills</label>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row">
               <input
                 value={newSkill}
