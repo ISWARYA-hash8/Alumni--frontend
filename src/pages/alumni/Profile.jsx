@@ -1,12 +1,14 @@
-import { useEffect, useState , useRef } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { X, Upload, Trash2, Camera } from "lucide-react";
+
 import { getMyProfile, updateProfile } from "../../services/apiService";
 import Button from "../../components/Button";
 import Loader from "../../components/Loader";
 import PageHeader from "../../components/PageHeader";
+
 import { useToast } from "../../context/ToastContext";
-import { getErrorMessage } from "../../utils/errors";
 import { useAuth } from "../../context/AuthContext";
+import { getErrorMessage } from "../../utils/errors";
 
 const DEPARTMENTS = [
   "Computer Science Engineering",
@@ -65,7 +67,9 @@ function MyProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+
   const fileInputRef = useRef(null);
+
   const { updateUser } = useAuth();
   const { addToast } = useToast();
 
@@ -122,73 +126,57 @@ function MyProfile() {
     new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error("Unable to read the selected image."));
+      reader.onerror = () =>
+        reject(new Error("Unable to read the selected image."));
       reader.readAsDataURL(file);
     });
 
   const handlePhotoChange = async (event) => {
     const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      addToast("Please choose an image file for your profile photo.", "error");
+      addToast("Please choose an image file.", "error");
       event.target.value = "";
       return;
     }
 
     if (file.size > MAX_PROFILE_PHOTO_SIZE) {
-      addToast("Profile photo must be 2 MB or smaller.", "error");
+      addToast("Image must be ≤ 2MB.", "error");
       event.target.value = "";
       return;
     }
 
     try {
       const imageDataUrl = await readFileAsDataUrl(file);
-      setFormData((current) => ({
-        ...current,
+      setFormData((prev) => ({
+        ...prev,
         profilePhoto: imageDataUrl
       }));
-      addToast("Profile photo selected. Save profile to keep it.", "success");
+      addToast("Photo selected. Save to apply.", "success");
     } catch (error) {
-      addToast(getErrorMessage(error, "Unable to use that image."), "error");
+      addToast(getErrorMessage(error, "Image error."), "error");
     } finally {
       event.target.value = "";
     }
   };
 
   const handleRemovePhoto = () => {
-    setFormData((current) => ({
-      ...current,
-      profilePhoto: ""
-    }));
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setFormData((prev) => ({ ...prev, profilePhoto: "" }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (!validate()) {
-      return;
-    }
+    if (!validate()) return;
 
     setSaving(true);
 
     try {
       await updateProfile({
+        ...formData,
         name: formData.name.trim(),
-        batchYear: formData.batchYear,
-        department: formData.department,
-        profession: formData.profession,
-        location: formData.location,
-        contact: formData.contact,
         linkedinUrl: formData.linkedinUrl.trim(),
-        profilePhoto: formData.profilePhoto,
         skills: formData.skills.join(",")
       });
 
@@ -199,7 +187,7 @@ function MyProfile() {
 
       addToast("Profile updated successfully.", "success");
     } catch (error) {
-      addToast(getErrorMessage(error, "Profile update failed."), "error");
+      addToast(getErrorMessage(error, "Update failed."), "error");
     } finally {
       setSaving(false);
     }
@@ -207,228 +195,169 @@ function MyProfile() {
 
   const addSkill = () => {
     const skill = newSkill.trim();
-    if (!skill || formData.skills.includes(skill)) {
-      return;
-    }
+    if (!skill || formData.skills.includes(skill)) return;
 
-    setFormData((current) => ({
-      ...current,
-      skills: [...current.skills, skill]
+    setFormData((prev) => ({
+      ...prev,
+      skills: [...prev.skills, skill]
     }));
     setNewSkill("");
   };
 
   const removeSkill = (index) => {
-    setFormData((current) => ({
-      ...current,
-      skills: current.skills.filter((_, currentIndex) => currentIndex !== index)
+    setFormData((prev) => ({
+      ...prev,
+      skills: prev.skills.filter((_, i) => i !== index)
     }));
   };
 
-  if (loading) {
-    return <Loader label="Loading profile..." />;
-  }
+  if (loading) return <Loader label="Loading profile..." />;
 
   return (
     <div className="space-y-8 p-6 md:p-8">
       <PageHeader
         title="My Profile"
-        subtitle="Keep your alumni profile updated so the directory stays useful and professional."
+        subtitle="Keep your alumni profile updated."
       />
 
       <div className="max-w-5xl rounded-3xl bg-white p-6 shadow-soft md:p-8">
-        <div className="mb-8 flex flex-col gap-5 rounded-3xl border border-slate-200 bg-slate-50 p-5 md:flex-row md:items-center md:justify-between">
+        {/* PROFILE PHOTO */}
+        <div className="mb-8 flex flex-col md:flex-row justify-between gap-5">
           <div className="flex items-center gap-4">
             {formData.profilePhoto ? (
               <img
                 src={formData.profilePhoto}
-                alt={formData.name || "Profile preview"}
-                className="h-24 w-24 rounded-3xl object-cover shadow-soft"
+                alt="Profile"
+                className="h-24 w-24 rounded-3xl object-cover"
               />
             ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-indigo-600 text-2xl font-bold text-white shadow-soft">
+              <div className="h-24 w-24 flex items-center justify-center bg-indigo-600 text-white rounded-3xl text-xl">
                 {getInitials(formData.name)}
               </div>
             )}
-
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-indigo-500">
-                Profile Photo
-              </p>
-              <h2 className="mt-2 text-lg font-semibold text-slate-900">
-                Add a clear headshot for your alumni profile
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Use JPG, PNG, or WebP up to 2 MB.
-              </p>
-            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex gap-3">
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept="image/*"
               className="hidden"
               onChange={handlePhotoChange}
             />
-            <Button
-              type="button"
-              className="inline-flex items-center gap-2"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload size={16} />
-              {formData.profilePhoto ? "Change Photo" : "Upload Photo"}
+
+            <Button onClick={() => fileInputRef.current?.click()}>
+              <Upload size={16} /> Upload
             </Button>
-            {formData.profilePhoto ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="inline-flex items-center gap-2"
-                onClick={handleRemovePhoto}
-              >
-                <Trash2 size={16} />
-                Remove
+
+            {formData.profilePhoto && (
+              <Button variant="outline" onClick={handleRemovePhoto}>
+                <Trash2 size={16} /> Remove
               </Button>
-            ) : (
-              <div className="inline-flex items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-medium text-slate-500">
-                <Camera size={16} />
-                No photo selected
-              </div>
             )}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700">Full Name</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, name: event.target.value }))
-              }
-              className="glass-input mt-2"
-            />
-            {errors.name ? <p className="mt-2 text-sm text-red-600">{errors.name}</p> : null}
-          </div>
+        {/* FORM */}
+        <form onSubmit={handleSubmit} className="grid gap-5 md:grid-cols-2">
+          <input
+            value={formData.name}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, name: e.target.value }))
+            }
+            placeholder="Full Name"
+            className="glass-input"
+          />
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700">Batch Year</label>
-            <input
-              type="text"
-              value={formData.batchYear}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, batchYear: event.target.value }))
-              }
-              className="glass-input mt-2"
-              placeholder="2024"
-            />
-            {errors.batchYear ? <p className="mt-2 text-sm text-red-600">{errors.batchYear}</p> : null}
-          </div>
+          <input
+            value={formData.batchYear}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, batchYear: e.target.value }))
+            }
+            placeholder="Batch Year"
+            className="glass-input"
+          />
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700">Department</label>
-            <select
-              value={formData.department}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, department: event.target.value }))
-              }
-              className="glass-input mt-2"
-            >
-              <option value="">Select Department</option>
-              {DEPARTMENTS.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={formData.department}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, department: e.target.value }))
+            }
+            className="glass-input"
+          >
+            <option value="">Select Department</option>
+            {DEPARTMENTS.map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700">Profession</label>
-            <input
-              type="text"
-              value={formData.profession}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, profession: event.target.value }))
-              }
-              className="glass-input mt-2"
-            />
-          </div>
+          <input
+            value={formData.profession}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, profession: e.target.value }))
+            }
+            placeholder="Profession"
+            className="glass-input"
+          />
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700">Contact</label>
-            <input
-              type="text"
-              value={formData.contact}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, contact: event.target.value }))
-              }
-              className="glass-input mt-2"
-            />
-          </div>
+          <input
+            value={formData.location}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, location: e.target.value }))
+            }
+            placeholder="Location"
+            className="glass-input"
+          />
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700">Location</label>
-            <input
-              type="text"
-              value={formData.location}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, location: event.target.value }))
-              }
-              className="glass-input mt-2"
-            />
-          </div>
+          <input
+            value={formData.contact}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, contact: e.target.value }))
+            }
+            placeholder="Contact"
+            className="glass-input"
+          />
 
+          <input
+            value={formData.linkedinUrl}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, linkedinUrl: e.target.value }))
+            }
+            placeholder="LinkedIn URL"
+            className="glass-input md:col-span-2"
+          />
+
+          {/* SKILLS */}
           <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-slate-700">LinkedIn Profile</label>
-            <input
-              type="url"
-              value={formData.linkedinUrl}
-              onChange={(event) =>
-                setFormData((current) => ({ ...current, linkedinUrl: event.target.value }))
-              }
-              className="glass-input mt-2"
-              placeholder="https://www.linkedin.com/in/your-profile"
-            />
-            {errors.linkedinUrl ? (
-              <p className="mt-2 text-sm text-red-600">{errors.linkedinUrl}</p>
-            ) : null}
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-slate-700">Skills</label>
-            <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+            <div className="flex gap-2">
               <input
                 value={newSkill}
-                onChange={(event) => setNewSkill(event.target.value)}
+                onChange={(e) => setNewSkill(e.target.value)}
+                placeholder="Add skill"
                 className="glass-input flex-1"
-                placeholder="Add a skill"
               />
               <Button type="button" onClick={addSkill}>
-                Add Skill
+                Add
               </Button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {formData.skills.map((skill, index) => (
-                <span
-                  key={`${skill}-${index}`}
-                  className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700"
-                >
-                  {skill}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => removeSkill(index)} />
+            <div className="flex flex-wrap gap-2 mt-3">
+              {formData.skills.map((s, i) => (
+                <span key={i} className="bg-gray-200 px-3 py-1 rounded-full">
+                  {s}
+                  <X
+                    className="inline ml-2 cursor-pointer"
+                    size={12}
+                    onClick={() => removeSkill(i)}
+                  />
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="md:col-span-2">
-            <Button type="submit" className="w-full md:w-auto" disabled={saving}>
-              {saving ? "Saving..." : "Save Profile"}
-            </Button>
-          </div>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving..." : "Save Profile"}
+          </Button>
         </form>
       </div>
     </div>
