@@ -1,4 +1,4 @@
-import { useEffect, useState , UseRef } from "react";
+import { useEffect, useState , useRef } from "react";
 import { X } from "lucide-react";
 import { getMyProfile, updateProfile } from "../../services/apiService";
 import Button from "../../components/Button";
