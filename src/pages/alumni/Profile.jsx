@@ -6,7 +6,7 @@ import Loader from "../../components/Loader";
 import PageHeader from "../../components/PageHeader";
 import { useToast } from "../../context/ToastContext";
 import { getErrorMessage } from "../../utils/errors";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 const DEPARTMENTS = [
   "Computer Science Engineering",
